@@ -48,13 +48,13 @@ import type { Match } from '../types/tournament';
  *   T99-110: C1=gf,        C2=FREE
  */
 
-interface SlotAssignment {
+export interface SlotAssignment {
   matchId: string;
   court: 1 | 2;
   startMinute: number;
 }
 
-const SCHEDULES: Record<number, SlotAssignment[]> = {
+export const SCHEDULES: Record<number, SlotAssignment[]> = {
   8: [
     { matchId: 'wbr1m1',   court: 1, startMinute: 0   },
     { matchId: 'wbr1m2',   court: 2, startMinute: 0   },
@@ -141,4 +141,21 @@ export function minutesToTime(startTime: Date, offsetMinutes: number): string {
 /** Returns true if the given match has a valid schedule slot assigned. */
 export function isScheduled(match: Match): boolean {
   return match.startMinute !== 0 || match.endMinute !== 0;
+}
+
+/** Match IDs in processing order (respects court queues and typical dependency order). */
+export function getScheduleOrder(numTeams: number): string[] {
+  return (SCHEDULES[numTeams] ?? []).map((s) => s.matchId);
+}
+
+/** Per-court match sequence (earlier = plays first on that court). */
+export function getCourtQueues(numTeams: number): { court1: string[]; court2: string[] } {
+  const slots = SCHEDULES[numTeams] ?? [];
+  const court1: string[] = [];
+  const court2: string[] = [];
+  for (const s of slots) {
+    if (s.court === 1) court1.push(s.matchId);
+    else court2.push(s.matchId);
+  }
+  return { court1, court2 };
 }

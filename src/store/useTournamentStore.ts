@@ -3,6 +3,11 @@ import { persist } from 'zustand/middleware';
 import type { ActiveTab, AppPhase, Match, Team, Tournament } from '../types/tournament';
 import { generateBracket, getMatchDuration } from '../utils/bracketGenerator';
 import { scheduleCourts } from '../utils/courtScheduler';
+import {
+  getEarliestFinishMinute,
+  isCourtQueueReady,
+  recomputeSchedule,
+} from '../utils/dynamicScheduler';
 import { pushTournament } from '../utils/firebaseSync';
 
 interface TournamentStore {
@@ -28,7 +33,7 @@ interface TournamentStore {
   // Tournament actions
   setActiveTab: (tab: ActiveTab) => void;
   selectMatch: (matchId: string | null) => void;
-  recordWinner: (matchId: string, winnerId: string) => void;
+  recordWinner: (matchId: string, winnerId: string, completedAtMinute?: number) => void;
   enableBracketReset: () => void;
 
   // Live-share actions
@@ -107,7 +112,7 @@ export const useTournamentStore = create<TournamentStore>()(
 
       selectMatch: (matchId) => set({ selectedMatchId: matchId }),
 
-      recordWinner: (matchId, winnerId) => {
+      recordWinner: (matchId, winnerId, completedAtMinuteOverride) => {
         const { tournament } = get();
         if (!tournament) return;
 
@@ -123,6 +128,15 @@ export const useTournamentStore = create<TournamentStore>()(
           match.slot1.team?.id === winnerId ? match.slot2.team : match.slot1.team;
 
         if (!winner || !loser) return;
+        if (!isCourtQueueReady(match, matches, tournament.numTeams)) return;
+
+        const wallClockMinute = Math.round(
+          (Date.now() - tournament.startTime.getTime()) / 60_000,
+        );
+        const completedAt = completedAtMinuteOverride ?? wallClockMinute;
+        const earliest = getEarliestFinishMinute(match, matches, tournament.numTeams);
+        match.completedAtMinute = Math.max(completedAt, earliest);
+        match.endMinute = match.completedAtMinute;
 
         match.winner = winner;
         match.loser = loser;
@@ -157,6 +171,8 @@ export const useTournamentStore = create<TournamentStore>()(
         const gfReset = byId.get('gf_reset');
         const isComplete = gf?.status === 'completed' &&
           (!gfReset?.resetActive || gfReset?.status === 'completed');
+
+        recomputeSchedule(matches, tournament.numTeams, tournament.matchDurationMinutes);
 
         const updatedTournament = { ...tournament, matches };
         set({

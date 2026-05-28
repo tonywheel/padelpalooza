@@ -50,8 +50,9 @@ export default function CourtSchedule() {
             <span className="text-gray-400 mx-1">→</span>
             <span className="font-bold text-gray-800">{endTime}</span>
           </div>
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-gray-500 text-right">
             {matchDurationMinutes} min/match
+            <span className="block text-green-600">Times update when you enter results</span>
           </div>
         </div>
         <div className="mt-1 flex items-center gap-1 text-xs text-purple-700">

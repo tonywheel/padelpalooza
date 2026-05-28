@@ -43,9 +43,11 @@ export interface Match {
 
   /** Court scheduling */
   courtNumber: 1 | 2;
-  /** Minutes from tournament start */
+  /** Minutes from tournament start (updated dynamically) */
   startMinute: number;
   endMinute: number;
+  /** Actual finish time when completed (drives rescheduling of later matches) */
+  completedAtMinute?: number;
 
   /** Grand-final bracket-reset flag */
   isResetMatch: boolean;
