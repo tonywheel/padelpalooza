@@ -9,15 +9,17 @@ import {
   recomputeSchedule,
 } from '../utils/dynamicScheduler';
 import { pushTournament } from '../utils/firebaseSync';
-import { generateRandomTeams } from '../utils/playerPairing';
+import { generateGenderAwareTeams } from '../utils/playerPairing';
 
 export type SetupMode = 'teams' | 'players';
 
 interface TournamentStore {
   phase: AppPhase;
   setupMode: SetupMode;
+  setupNumTeams: number;
   teamNames: string[];
-  playerNames: string[];
+  boyNames: string[];
+  girlNames: string[];
   /** Team names from last player shuffle; null until first generate */
   pairedTeamNames: string[] | null;
   startTimeStr: string; // "HH:MM" 24-hour format
@@ -32,8 +34,10 @@ interface TournamentStore {
 
   // Setup actions
   setSetupMode: (mode: SetupMode) => void;
+  setSetupNumTeams: (n: number) => void;
   setTeamNames: (names: string[]) => void;
-  setPlayerNames: (names: string[]) => void;
+  setBoyNames: (names: string[]) => void;
+  setGirlNames: (names: string[]) => void;
   generatePlayerTeams: () => void;
   setStartTime: (time: string) => void;
   setTournamentName: (name: string) => void;
@@ -65,8 +69,10 @@ export const useTournamentStore = create<TournamentStore>()(
     (set, get) => ({
       phase: 'setup',
       setupMode: 'teams',
+      setupNumTeams: 8,
       teamNames: Array(8).fill(''),
-      playerNames: Array(16).fill(''),
+      boyNames: Array(16).fill(''),
+      girlNames: Array(16).fill(''),
       pairedTeamNames: null,
       startTimeStr: '14:00',
       tournamentName: '',
@@ -78,17 +84,29 @@ export const useTournamentStore = create<TournamentStore>()(
 
       setSetupMode: (mode) => set({ setupMode: mode, pairedTeamNames: null }),
 
+      setSetupNumTeams: (n) =>
+        set({
+          setupNumTeams: n,
+          teamNames: Array(n).fill('').map((_, i) => get().teamNames[i] ?? ''),
+          boyNames: Array(n * 2).fill('').map((_, i) => get().boyNames[i] ?? ''),
+          girlNames: Array(n * 2).fill('').map((_, i) => get().girlNames[i] ?? ''),
+          pairedTeamNames: null,
+        }),
+
       setTeamNames: (names) => set({ teamNames: names }),
 
-      setPlayerNames: (names) => set({ playerNames: names, pairedTeamNames: null }),
+      setBoyNames: (names) => set({ boyNames: names, pairedTeamNames: null }),
+
+      setGirlNames: (names) => set({ girlNames: names, pairedTeamNames: null }),
 
       generatePlayerTeams: () => {
-        const { playerNames } = get();
-        const expected = playerNames.length;
-        const filled = playerNames.map((n) => n.trim()).filter(Boolean);
-        if (filled.length !== expected || expected % 2 !== 0) return;
+        const { boyNames, girlNames, setupNumTeams } = get();
+        const expected = setupNumTeams * 2;
+        const boys = boyNames.map((n) => n.trim()).filter(Boolean);
+        const girls = girlNames.map((n) => n.trim()).filter(Boolean);
+        if (boys.length + girls.length !== expected) return;
         try {
-          const teams = generateRandomTeams(filled);
+          const teams = generateGenderAwareTeams(boys, girls);
           set({ pairedTeamNames: teams });
         } catch {
           // invalid input (duplicates, etc.)
@@ -136,11 +154,13 @@ export const useTournamentStore = create<TournamentStore>()(
         set({
           phase: 'setup',
           setupMode: 'teams',
+          setupNumTeams: 8,
           tournament: null,
           selectedMatchId: null,
           activeTab: 'bracket',
           teamNames: Array(8).fill(''),
-          playerNames: Array(16).fill(''),
+          boyNames: Array(16).fill(''),
+          girlNames: Array(16).fill(''),
           pairedTeamNames: null,
           isLive: false,
           liveSlug: null,

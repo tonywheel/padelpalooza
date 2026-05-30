@@ -1,44 +1,33 @@
-import { useState } from 'react';
 import { useTournamentStore } from '../store/useTournamentStore';
 import type { SetupMode } from '../store/useTournamentStore';
 
 export default function SetupScreen() {
   const {
     setupMode,
+    setupNumTeams,
     teamNames,
-    playerNames,
+    boyNames,
+    girlNames,
     pairedTeamNames,
     startTimeStr,
     tournamentName,
     setSetupMode,
+    setSetupNumTeams,
     setTeamNames,
-    setPlayerNames,
+    setBoyNames,
+    setGirlNames,
     generatePlayerTeams,
     setStartTime,
     setTournamentName,
     startTournament,
   } = useTournamentStore();
 
-  const [numTeams, setNumTeams] = useState(() => {
-    if (setupMode === 'players' && pairedTeamNames?.length) return pairedTeamNames.length;
-    const filled = teamNames.filter((n) => n.trim()).length;
-    return filled >= 8 && filled <= 10 ? filled : 8;
-  });
-
+  const numTeams = setupNumTeams;
   const numPlayers = numTeams * 2;
 
-  const handleNumChange = (n: number) => {
-    setNumTeams(n);
-    setTeamNames(Array(n).fill('').map((_, i) => teamNames[i] ?? ''));
-    setPlayerNames(Array(n * 2).fill('').map((_, i) => playerNames[i] ?? ''));
-  };
+  const handleNumChange = (n: number) => setSetupNumTeams(n);
 
-  const handleModeChange = (mode: SetupMode) => {
-    setSetupMode(mode);
-    if (mode === 'players') {
-      setPlayerNames(Array(numTeams * 2).fill('').map((_, i) => playerNames[i] ?? ''));
-    }
-  };
+  const handleModeChange = (mode: SetupMode) => setSetupMode(mode);
 
   const handleTeamNameChange = (i: number, val: string) => {
     const next = [...teamNames];
@@ -46,13 +35,21 @@ export default function SetupScreen() {
     setTeamNames(next);
   };
 
-  const handlePlayerNameChange = (i: number, val: string) => {
-    const next = [...playerNames];
+  const handleBoyChange = (i: number, val: string) => {
+    const next = [...boyNames];
     next[i] = val;
-    setPlayerNames(next);
+    setBoyNames(next);
   };
 
-  const filledPlayers = playerNames.slice(0, numPlayers).map((n) => n.trim()).filter(Boolean);
+  const handleGirlChange = (i: number, val: string) => {
+    const next = [...girlNames];
+    next[i] = val;
+    setGirlNames(next);
+  };
+
+  const filledBoys = boyNames.map((n) => n.trim()).filter(Boolean);
+  const filledGirls = girlNames.map((n) => n.trim()).filter(Boolean);
+  const filledPlayers = [...filledBoys, ...filledGirls];
   const playerNamesUnique =
     new Set(filledPlayers.map((p) => p.toLowerCase())).size === filledPlayers.length;
   const allPlayersFilled = filledPlayers.length === numPlayers;
@@ -69,6 +66,10 @@ export default function SetupScreen() {
 
   const canStart = canStartTeams || canStartPlayers;
 
+  // Show enough rows per column (expand as user fills names)
+  const boyRows = Math.min(numPlayers, Math.max(numTeams, filledBoys.length + 1));
+  const girlRows = Math.min(numPlayers, Math.max(numTeams, filledGirls.length + 1));
+
   return (
     <div className="h-full bg-green-50 flex flex-col" style={{ minHeight: '100dvh' }}>
       <div className="bg-green-700 text-white px-4 pt-12 pb-6">
@@ -77,7 +78,6 @@ export default function SetupScreen() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-5 space-y-5 pb-32">
-        {/* Team count */}
         <section className="bg-white rounded-2xl shadow-sm p-4">
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
             Number of Teams
@@ -106,7 +106,6 @@ export default function SetupScreen() {
           )}
         </section>
 
-        {/* Tournament name */}
         <section className="bg-white rounded-2xl shadow-sm p-4">
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
             Tournament Name <span className="text-gray-300 font-normal normal-case">(optional)</span>
@@ -121,7 +120,6 @@ export default function SetupScreen() {
           <p className="text-xs text-gray-400 mt-1.5">Used for the live share link, e.g. /v/padel-palooza</p>
         </section>
 
-        {/* Start time */}
         <section className="bg-white rounded-2xl shadow-sm p-4">
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
             Tournament Start Time
@@ -138,7 +136,6 @@ export default function SetupScreen() {
           </p>
         </section>
 
-        {/* Setup mode toggle */}
         <section className="bg-white rounded-2xl shadow-sm p-4">
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
             How to enter teams
@@ -168,7 +165,7 @@ export default function SetupScreen() {
           <p className="text-xs text-gray-400 mt-2">
             {setupMode === 'teams'
               ? 'Enter each team name directly.'
-              : `Enter ${numPlayers} players — we'll pair them into ${numTeams} teams of 2.`}
+              : `Enter ${numPlayers} players in the Boys / Girls columns — we pair boy/girl teams when possible.`}
           </p>
         </section>
 
@@ -197,27 +194,62 @@ export default function SetupScreen() {
         ) : (
           <>
             <section className="bg-white rounded-2xl shadow-sm p-4">
-              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                Player Names ({numPlayers})
-              </h2>
-              <div className="space-y-2">
-                {Array.from({ length: numPlayers }, (_, i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <span className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 text-sm font-bold flex items-center justify-center shrink-0">
-                      {i + 1}
-                    </span>
-                    <input
-                      type="text"
-                      placeholder={`Player ${i + 1}`}
-                      value={playerNames[i] ?? ''}
-                      onChange={(e) => handlePlayerNameChange(i, e.target.value)}
-                      className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                    />
-                  </div>
-                ))}
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+                  Players ({filledBoys.length + filledGirls.length}/{numPlayers})
+                </h2>
+                <span className="text-xs text-gray-400">
+                  {filledBoys.length} boys · {filledGirls.length} girls
+                </span>
               </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {/* Boys column */}
+                <div>
+                  <div className="text-xs font-bold text-blue-700 uppercase tracking-wide mb-2 text-center bg-blue-50 rounded-lg py-1">
+                    Boys
+                  </div>
+                  <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+                    {Array.from({ length: boyRows }, (_, i) => (
+                      <input
+                        key={`b-${i}`}
+                        type="text"
+                        placeholder={`Boy ${i + 1}`}
+                        value={boyNames[i] ?? ''}
+                        onChange={(e) => handleBoyChange(i, e.target.value)}
+                        className="w-full border border-blue-100 bg-blue-50/50 rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Girls column */}
+                <div>
+                  <div className="text-xs font-bold text-pink-700 uppercase tracking-wide mb-2 text-center bg-pink-50 rounded-lg py-1">
+                    Girls
+                  </div>
+                  <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+                    {Array.from({ length: girlRows }, (_, i) => (
+                      <input
+                        key={`g-${i}`}
+                        type="text"
+                        placeholder={`Girl ${i + 1}`}
+                        value={girlNames[i] ?? ''}
+                        onChange={(e) => handleGirlChange(i, e.target.value)}
+                        className="w-full border border-pink-100 bg-pink-50/50 rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-pink-400"
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
               {!playerNamesUnique && filledPlayers.length > 0 && (
                 <p className="text-xs text-red-500 mt-2">Each player name must be unique.</p>
+              )}
+              {filledPlayers.length > 0 && filledPlayers.length !== numPlayers && (
+                <p className="text-xs text-amber-600 mt-2">
+                  Need exactly {numPlayers} players total ({numPlayers - filledPlayers.length} more).
+                </p>
               )}
             </section>
 
@@ -253,12 +285,12 @@ export default function SetupScreen() {
                     </div>
                   ))}
                   <p className="text-xs text-gray-400 mt-2">
-                    Not happy? Tap <strong>Shuffle Again</strong> as many times as you like, then generate the bracket.
+                    Boy/girl pairs when possible. Tap <strong>Shuffle Again</strong> for new pairings.
                   </p>
                 </div>
               ) : (
                 <p className="text-sm text-gray-400 text-center py-4">
-                  Fill in all {numPlayers} player names, then tap <strong>Generate Teams</strong>.
+                  Fill in all {numPlayers} players, then tap <strong>Generate Teams</strong>.
                 </p>
               )}
             </section>
@@ -266,7 +298,6 @@ export default function SetupScreen() {
         )}
       </div>
 
-      {/* Start button */}
       <div className="fixed bottom-0 inset-x-0 p-4 bg-white border-t border-gray-100">
         <button
           onClick={startTournament}

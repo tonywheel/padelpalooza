@@ -4,7 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host --open",
+    "dev:clean": "lsof -ti:5173,5174 | xargs kill -9 2>/dev/null; vite --host --open",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
