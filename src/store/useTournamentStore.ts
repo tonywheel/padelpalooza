@@ -9,10 +9,17 @@ import {
   recomputeSchedule,
 } from '../utils/dynamicScheduler';
 import { pushTournament } from '../utils/firebaseSync';
+import { generateRandomTeams } from '../utils/playerPairing';
+
+export type SetupMode = 'teams' | 'players';
 
 interface TournamentStore {
   phase: AppPhase;
+  setupMode: SetupMode;
   teamNames: string[];
+  playerNames: string[];
+  /** Team names from last player shuffle; null until first generate */
+  pairedTeamNames: string[] | null;
   startTimeStr: string; // "HH:MM" 24-hour format
   tournamentName: string; // e.g. "Padel Palooza"
   tournament: Tournament | null;
@@ -24,7 +31,10 @@ interface TournamentStore {
   liveSlug: string | null; // e.g. "padel-palooza"
 
   // Setup actions
+  setSetupMode: (mode: SetupMode) => void;
   setTeamNames: (names: string[]) => void;
+  setPlayerNames: (names: string[]) => void;
+  generatePlayerTeams: () => void;
   setStartTime: (time: string) => void;
   setTournamentName: (name: string) => void;
   startTournament: () => void;
@@ -54,7 +64,10 @@ export const useTournamentStore = create<TournamentStore>()(
   persist(
     (set, get) => ({
       phase: 'setup',
+      setupMode: 'teams',
       teamNames: Array(8).fill(''),
+      playerNames: Array(16).fill(''),
+      pairedTeamNames: null,
       startTimeStr: '14:00',
       tournamentName: '',
       tournament: null,
@@ -63,13 +76,36 @@ export const useTournamentStore = create<TournamentStore>()(
       isLive: false,
       liveSlug: null,
 
+      setSetupMode: (mode) => set({ setupMode: mode, pairedTeamNames: null }),
+
       setTeamNames: (names) => set({ teamNames: names }),
+
+      setPlayerNames: (names) => set({ playerNames: names, pairedTeamNames: null }),
+
+      generatePlayerTeams: () => {
+        const { playerNames } = get();
+        const expected = playerNames.length;
+        const filled = playerNames.map((n) => n.trim()).filter(Boolean);
+        if (filled.length !== expected || expected % 2 !== 0) return;
+        try {
+          const teams = generateRandomTeams(filled);
+          set({ pairedTeamNames: teams });
+        } catch {
+          // invalid input (duplicates, etc.)
+        }
+      },
+
       setStartTime: (time) => set({ startTimeStr: time }),
       setTournamentName: (name) => set({ tournamentName: name }),
 
       startTournament: () => {
-        const { teamNames, startTimeStr } = get();
-        const filledNames = teamNames.filter((n) => n.trim() !== '');
+        const { teamNames, setupMode, pairedTeamNames, startTimeStr } = get();
+
+        const filledNames =
+          setupMode === 'players'
+            ? (pairedTeamNames ?? []).filter((n) => n.trim() !== '')
+            : teamNames.filter((n) => n.trim() !== '');
+
         const n = filledNames.length;
         if (n < 8 || n > 10) return;
 
@@ -99,10 +135,13 @@ export const useTournamentStore = create<TournamentStore>()(
       resetApp: () =>
         set({
           phase: 'setup',
+          setupMode: 'teams',
           tournament: null,
           selectedMatchId: null,
           activeTab: 'bracket',
           teamNames: Array(8).fill(''),
+          playerNames: Array(16).fill(''),
+          pairedTeamNames: null,
           isLive: false,
           liveSlug: null,
           tournamentName: '',
