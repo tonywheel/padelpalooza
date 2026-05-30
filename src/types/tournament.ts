@@ -1,7 +1,7 @@
 export type BracketSection = 'winners' | 'losers' | 'grand_final';
 export type MatchStatus = 'pending' | 'ready' | 'completed' | 'bye';
 export type AppPhase = 'setup' | 'tournament' | 'complete';
-export type ActiveTab = 'bracket' | 'schedule';
+export type ActiveTab = 'bracket' | 'schedule' | 'seeding';
 
 export interface Team {
   id: string;

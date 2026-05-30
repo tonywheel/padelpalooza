@@ -3,12 +3,14 @@ import { useTournamentStore } from './store/useTournamentStore';
 import SetupScreen from './components/SetupScreen';
 import BracketView from './components/BracketView';
 import CourtSchedule from './components/CourtSchedule';
+import SeedingEditor from './components/SeedingEditor';
 import TabBar from './components/TabBar';
 import WinnerModal from './components/WinnerModal';
 import GoLiveModal from './components/GoLiveModal';
 import SpectatorView from './components/SpectatorView';
 import type { Match } from './types/tournament';
 import { isFirebaseConfigured } from './firebase';
+import { isSeedingLocked } from './utils/seedEditing';
 
 // ─── Minimal path router (no external library needed) ────────────────────────
 
@@ -47,6 +49,15 @@ function AdminApp() {
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [showGoLive, setShowGoLive] = useState(false);
 
+  const seedingLocked = isSeedingLocked(tournament ?? null, isLive);
+  const showSeedingTab = !seedingLocked;
+
+  useEffect(() => {
+    if (!showSeedingTab && activeTab === 'seeding') {
+      setActiveTab('bracket');
+    }
+  }, [showSeedingTab, activeTab, setActiveTab]);
+
   if (phase === 'setup') return <SetupScreen />;
 
   const champion =
@@ -67,6 +78,7 @@ function AdminApp() {
             <p className="text-green-200 text-xs mt-0.5">
               {tournament.numTeams} teams · {tournament.matchDurationMinutes} min/match ·{' '}
               {tournament.startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+              {seedingLocked && ' · Seeding locked'}
             </p>
           )}
         </div>
@@ -103,14 +115,14 @@ function AdminApp() {
       )}
 
       <div className="flex-1 overflow-hidden flex flex-col pb-16">
-        {activeTab === 'bracket' ? (
-          <BracketView onMatchTap={setSelectedMatch} />
-        ) : (
-          <CourtSchedule />
+        {activeTab === 'bracket' && (
+          <BracketView onMatchTap={setSelectedMatch} seedingEnabled={showSeedingTab} />
         )}
+        {activeTab === 'schedule' && <CourtSchedule />}
+        {activeTab === 'seeding' && showSeedingTab && <SeedingEditor />}
       </div>
 
-      <TabBar active={activeTab} onChange={setActiveTab} />
+      <TabBar active={activeTab} onChange={setActiveTab} showSeeding={showSeedingTab} />
 
       {selectedMatch && (
         <WinnerModal match={selectedMatch} onClose={() => setSelectedMatch(null)} />

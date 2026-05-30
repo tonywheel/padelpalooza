@@ -10,6 +10,12 @@ import {
 } from '../utils/dynamicScheduler';
 import { pushTournament } from '../utils/firebaseSync';
 import { generateGenderAwareTeams } from '../utils/playerPairing';
+import {
+  canSwapSlots,
+  isSeedingLocked,
+  swapSeedSlots,
+  type SeedSlotRef,
+} from '../utils/seedEditing';
 
 export type SetupMode = 'teams' | 'players';
 
@@ -27,6 +33,7 @@ interface TournamentStore {
   tournament: Tournament | null;
   activeTab: ActiveTab;
   selectedMatchId: string | null;
+  selectedSeedSlot: SeedSlotRef | null;
 
   // Live-share state
   isLive: boolean;
@@ -47,6 +54,8 @@ interface TournamentStore {
   // Tournament actions
   setActiveTab: (tab: ActiveTab) => void;
   selectMatch: (matchId: string | null) => void;
+  tapSeedSlot: (ref: SeedSlotRef) => void;
+  clearSeedSelection: () => void;
   recordWinner: (matchId: string, winnerId: string, completedAtMinute?: number) => void;
   enableBracketReset: () => void;
 
@@ -79,6 +88,7 @@ export const useTournamentStore = create<TournamentStore>()(
       tournament: null,
       activeTab: 'bracket',
       selectedMatchId: null,
+      selectedSeedSlot: null,
       isLive: false,
       liveSlug: null,
 
@@ -157,6 +167,7 @@ export const useTournamentStore = create<TournamentStore>()(
           setupNumTeams: 8,
           tournament: null,
           selectedMatchId: null,
+          selectedSeedSlot: null,
           activeTab: 'bracket',
           teamNames: Array(8).fill(''),
           boyNames: Array(16).fill(''),
@@ -170,6 +181,36 @@ export const useTournamentStore = create<TournamentStore>()(
       setActiveTab: (tab) => set({ activeTab: tab }),
 
       selectMatch: (matchId) => set({ selectedMatchId: matchId }),
+
+      tapSeedSlot: (ref) => {
+        const { tournament, isLive, selectedSeedSlot } = get();
+        if (!tournament || isSeedingLocked(tournament, isLive)) return;
+
+        const locked = isSeedingLocked(tournament, isLive);
+
+        if (!selectedSeedSlot) {
+          set({ selectedSeedSlot: ref });
+          return;
+        }
+
+        if (
+          selectedSeedSlot.matchId === ref.matchId &&
+          selectedSeedSlot.slot === ref.slot
+        ) {
+          set({ selectedSeedSlot: null });
+          return;
+        }
+
+        if (!canSwapSlots(tournament.matches, selectedSeedSlot, ref, locked)) return;
+
+        const matches = swapSeedSlots(tournament.matches, selectedSeedSlot, ref);
+        set({
+          tournament: { ...tournament, matches },
+          selectedSeedSlot: null,
+        });
+      },
+
+      clearSeedSelection: () => set({ selectedSeedSlot: null }),
 
       recordWinner: (matchId, winnerId, completedAtMinuteOverride) => {
         const { tournament } = get();
@@ -234,10 +275,13 @@ export const useTournamentStore = create<TournamentStore>()(
         recomputeSchedule(matches, tournament.numTeams, tournament.matchDurationMinutes);
 
         const updatedTournament = { ...tournament, matches };
+        const seedingNowLocked = isSeedingLocked(updatedTournament, get().isLive);
         set({
           tournament: updatedTournament,
           phase: isComplete ? 'complete' : 'tournament',
           selectedMatchId: null,
+          selectedSeedSlot: null,
+          activeTab: seedingNowLocked && get().activeTab === 'seeding' ? 'bracket' : get().activeTab,
         });
 
         // Push to Firebase if live
@@ -253,7 +297,12 @@ export const useTournamentStore = create<TournamentStore>()(
         const { tournament, tournamentName } = get();
         if (!tournament) return;
         await pushTournament(slug, tournamentName || slug, tournament);
-        set({ isLive: true, liveSlug: slug });
+        set({
+          isLive: true,
+          liveSlug: slug,
+          selectedSeedSlot: null,
+          activeTab: get().activeTab === 'seeding' ? 'bracket' : get().activeTab,
+        });
       },
 
       enableBracketReset: () => {

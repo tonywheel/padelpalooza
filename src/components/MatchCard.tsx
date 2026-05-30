@@ -1,11 +1,14 @@
 
 import type { Match } from '../types/tournament';
 import { CARD_W, CARD_H } from '../utils/bracketGenerator';
+import { isSwappableSlot, type SeedSlotRef } from '../utils/seedEditing';
 
 interface Props {
   match: Match;
   onTap: (match: Match) => void;
   startTime: Date;
+  seedingEnabled?: boolean;
+  selectedSeedSlot?: SeedSlotRef | null;
 }
 
 function minutesToClock(startTime: Date, offset: number): string {
@@ -13,7 +16,13 @@ function minutesToClock(startTime: Date, offset: number): string {
   return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 }
 
-export default function MatchCard({ match, onTap, startTime }: Props) {
+export default function MatchCard({
+  match,
+  onTap,
+  startTime,
+  seedingEnabled = false,
+  selectedSeedSlot = null,
+}: Props) {
   const { slot1, slot2, winner, status } = match;
   const isCompleted = status === 'completed';
   const isReady = status === 'ready';
@@ -21,10 +30,17 @@ export default function MatchCard({ match, onTap, startTime }: Props) {
 
   const teamRow = (
     slotTeam: typeof slot1,
+    slotNum: 1 | 2,
     isWinner: boolean,
     isLoser: boolean,
   ) => {
     const name = slotTeam.team?.name ?? 'TBD';
+    const swappable = seedingEnabled && isSwappableSlot(match, slotNum);
+    const selected =
+      swappable &&
+      selectedSeedSlot?.matchId === match.id &&
+      selectedSeedSlot?.slot === slotNum;
+
     return (
       <div
         className={`flex items-center gap-1.5 px-2 h-[26px] ${
@@ -35,6 +51,8 @@ export default function MatchCard({ match, onTap, startTime }: Props) {
             : slotTeam.team
             ? 'text-gray-800'
             : 'text-gray-400 italic'
+        } ${swappable ? 'ring-1 ring-inset ring-blue-200' : ''} ${
+          selected ? 'bg-blue-100 ring-2 ring-blue-500' : ''
         }`}
       >
         {isWinner && <span className="text-yellow-300 text-xs">★</span>}
@@ -69,6 +87,7 @@ export default function MatchCard({ match, onTap, startTime }: Props) {
       {/* Top team */}
       {teamRow(
         slot1,
+        1,
         !!(winner && winner.id === slot1.team?.id),
         !!(winner && winner.id !== slot1.team?.id && slot1.team),
       )}
@@ -81,6 +100,7 @@ export default function MatchCard({ match, onTap, startTime }: Props) {
       {/* Bottom team */}
       {teamRow(
         slot2,
+        2,
         !!(winner && winner.id === slot2.team?.id),
         !!(winner && winner.id !== slot2.team?.id && slot2.team),
       )}

@@ -6,10 +6,11 @@ import { useTournamentStore } from '../store/useTournamentStore';
 
 interface Props {
   onMatchTap: (match: Match) => void;
+  seedingEnabled?: boolean;
 }
 
-export default function BracketView({ onMatchTap }: Props) {
-  const { tournament } = useTournamentStore();
+export default function BracketView({ onMatchTap, seedingEnabled = false }: Props) {
+  const { tournament, selectedSeedSlot } = useTournamentStore();
   if (!tournament) return null;
 
   const { matches, startTime, matchDurationMinutes, numTeams } = tournament;
@@ -86,8 +87,13 @@ export default function BracketView({ onMatchTap }: Props) {
         <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-yellow-500 inline-block" /> GF</span>
         <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-blue-500 inline-block" /> C1</span>
         <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-purple-500 inline-block" /> C2</span>
-        <span className="ml-auto font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded-full">
-          {numTeams} teams · {matchDurationMinutes} min
+        <span className="ml-auto flex items-center gap-2">
+          {seedingEnabled && (
+            <span className="text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">Seeding editable</span>
+          )}
+          <span className="font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded-full">
+            {numTeams} teams · {matchDurationMinutes} min
+          </span>
         </span>
       </div>
 
@@ -132,6 +138,8 @@ export default function BracketView({ onMatchTap }: Props) {
               match={match}
               onTap={onMatchTap}
               startTime={startTime}
+              seedingEnabled={seedingEnabled}
+              selectedSeedSlot={selectedSeedSlot}
             />
           ))}
         </div>
